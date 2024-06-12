@@ -1,0 +1,9 @@
+2006-05-17 Martin Strubel <hackfin@section5.ch>
+
+	RELEASE 1.01beta:
+	* Added missing files to distribution
+	* Added --speed option
+	* Fixed bfemu flaw
+
+2006-05-05 Martin Strubel <hackfin@section5.ch>
+	Initial RELEASE 1.00beta

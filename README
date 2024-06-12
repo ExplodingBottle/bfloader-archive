@@ -1,0 +1,38 @@
+This is bfloader, a script collection plus loader backend to get images into
+your flash quickly using the ICEbear JTAG adapter. It depends on an
+installation of the GDB JTAG toolchain (see bottom link).
+
+The backend interface is basically the same as from VDSP's flash loader plugin.
+You may easily adapt existing VDSP loader backends to the GNU toolchain.
+
+This source code is provided 'as is' without support or warranty.
+You may use the source code in whatever way you like, but we would prefer
+to keep it OpenSource. If you have made a setup for another board, let
+us know.
+
+Currently, a small number of directly memory mapped flashes are supported.
+The code does not tend to be very generic, but rather simple.
+Basically, you only adapt your flash map in the file main.c of your board
+directory when supporting another board.
+
+
+Usage:
+
+0. Check for a plugged in ICEbear and running gdbproxy
+1. Enter the appropriate directory matching your board's type
+2. Edit 'flashload.sh' and change the location of your flash image(s)
+3. Edit '.gdbinit', if necessary
+4. Run the flashload.sh script
+
+See also application notes via the link below.
+
+Have fun!
+
+----------------------------------------------------------------------------
+
+Find updates and other software at:
+
+http://www.section5.ch/software/
+
+----------------------------------------------------------------------------
+01/2006  <hackfin@section5.ch>
