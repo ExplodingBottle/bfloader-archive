@@ -32,4 +32,4 @@ echo "set \$size =" `du -b $rootfs | sed 's/^\([0-9]*\).*/\1/'` >> $rootfs_loade
 echo "shell cp $rootfs /tmp/flash.dat" >> $rootfs_loader
 echo "writefile $offset_rootfs \$size" >> $rootfs_loader
 
-bfin-jtag-gdb bfloader.dxe
+bfin-elf-gdb bfloader.dxe

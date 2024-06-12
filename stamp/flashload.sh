@@ -32,4 +32,4 @@ echo "set \$size =" `du -b $linux | sed 's/^\([0-9]*\).*/\1/'` >> $linux_loader
 echo "shell cp $linux /tmp/flash.dat" >> $linux_loader
 echo "writefile $offset_linux \$size" >> $linux_loader
 
-bfin-jtag-gdb bfloader.dxe
+bfin-elf-gdb bfloader.dxe

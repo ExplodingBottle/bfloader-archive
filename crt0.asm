@@ -5,7 +5,7 @@
 //
 // 2004, 2005 Martin Strubel <hackfin@section5.ch>
 //
-// $Id: crt0.asm,v 1.2 2006/05/03 15:31:59 strubi Exp $
+// $Id: crt0.asm,v 1.1 2006/01/01 17:58:11 strubi Exp $
 //
 //
 //
@@ -292,7 +292,14 @@ stall:
 	jump stall;
 
 EXC_HANDLER:          // exception handler
+	r0 = seqstat;
+	r1 = retx;
+	// call _report_exception
+	cc = r0 == 0;
+	if !cc jump cont_program;
 	jump idle_loop;
+cont_program:
+	rtx;
 
 _THANDLER:            // Timer Handler 6	
 	r0.l = 6;

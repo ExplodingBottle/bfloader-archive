@@ -1,11 +1,7 @@
 # Common makefile for bfloader stuff
 #
 #
-OBJS = main.o
-
-ifndef NO_COMMON
-	OBJS += common.o
-endif
+OBJS = main.o common.o
 
 NAME = bfloader
 
@@ -18,10 +14,6 @@ CFLAGS += -Wall
 CFLAGS += -D__ADSPLPBLACKFIN__ -D__ADSPBLACKFIN__
 CFLAGS += -DBOARD_$(BOARD)
 
-ifdef DEBUG
-	CFLAGS += -g
-endif
-
 LDFLAGS =  -Tbftiny.x
 LDFLAGS += -B.
 
@@ -32,7 +24,7 @@ all : $(OBJS) crt0.o
 crt0.o : ../crt0.asm
 	$(CC) -c -x assembler-with-cpp -o $@ $< $(CFLAGS) 
 
-common.o: ../common/common.c
+common.o: ../common.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:

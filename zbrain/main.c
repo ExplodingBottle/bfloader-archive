@@ -34,20 +34,15 @@
 #define FLASH_BASE      0x20200000
 // The buffer size in L1 memory (used for data transfer to flash)
 #define BUFFER_SIZE		0x2000
+// Number of sectors on flash
+#define	NUM_SECTORS 	128
+// Sector size
+#define SECTOR_SIZE     0x8000
 
 // Page flipping access to flash: window size
 #define PAGE_SIZE       0x100000
 // Window mask address
 #define PAGE_MASK       0x0fffff
-
-struct sector_desc g_sectors[] = {
-	{ 0x000000, 128, 0x8000 }
-};
-
-#define MAPSIZE (sizeof(g_sectors) / sizeof(struct sector_desc))
-
-unsigned short g_mapsize = MAPSIZE;
-struct sector_desc *g_sectormap = g_sectors;
 
 ////////////////////////////////////////////////////////////////////////////
 // GLOBALS 
@@ -55,16 +50,30 @@ struct sector_desc *g_sectormap = g_sectors;
 
 static
 unsigned short g_buffer[BUFFER_SIZE >> 1];
+SectorLocation SectorInfo[NUM_SECTORS];
 
 //
 // DATA NEEDED BY FRONTEND:
 
 char           *AFP_Title           = "ZBrain Flash driver";
 char           *AFP_Description     = "AM29LV641D";
+ProgCmd         AFP_Command         = NO_COMMAND;
+int             AFP_ManCode         = -1;
+int             AFP_DevCode         = -1;
+unsigned long   AFP_Offset          = 0x0;
+short          *AFP_Buffer;
 long            AFP_Size            = BUFFER_SIZE;
-
-extern long     AFP_SectorSize1;
-extern short   *AFP_Buffer;
+long            AFP_Count           = -1;
+long            AFP_Stride          = 1;
+int             AFP_NumSectors      = NUM_SECTORS;
+long            AFP_SectorSize1     = SECTOR_SIZE;
+int             AFP_Sector          = -1;
+int             AFP_Error           = 0;            // error code
+int             AFP_Verify          = 0;            // verify flag
+unsigned long   AFP_StartOff        = 0x0;          // sector start offset
+unsigned long   AFP_EndOff          = 0x0;          // sector end offset
+int             AFP_FlashWidth      = 0x10;         // width of the flash
+int            *AFP_SectorInfo;
 
 
 ////////////////////////////////////////////////////////////////////////////
@@ -75,8 +84,7 @@ extern short   *AFP_Buffer;
 void init_ledports()
 {
 	*pFIO_DIR    = 0x00f0;
-	*pFIO_INEN   = 0x0f05;
-	*pFIO_FLAG_D = 0x0000;
+	*pFIO_FLAG_D = 0x00a0;
 	*pFIO_INEN   = 0x0000; // enable input for buttons
 
 	DOUT = 0x00;
@@ -86,7 +94,7 @@ void init_ledports()
 void set_led(int leds)
 {
 	*pFIO_FLAG_D = (leds & 0xf) << 4;
-	DOUT = (leds >> 4);
+	DOUT = (leds >> 4) & 0xf;
 }
 
 // Bank switching support for ZBrain
@@ -107,17 +115,17 @@ void zbrain_pageselect(unsigned long addr)
 	base[0x34] = (base[0x34] & ~0xe0) | addr;
 }
 
-int flash_write(unsigned long offset, short value)
+int flash_write(unsigned long offset, int value)
 {
 	zbrain_pageselect(offset);
 
 	offset &= PAGE_MASK;
 	offset += FLASH_BASE;
 	asm("ssync;");
-	*(volatile short *) offset = value;
+	*(unsigned volatile short *) offset = value;
 	asm("ssync;");
 
-	return ERR_NONE;
+	return NO_ERR;
 }
 
 int flash_read(unsigned long offset, short *value)
@@ -125,32 +133,147 @@ int flash_read(unsigned long offset, short *value)
 	zbrain_pageselect(offset);
 	offset &= PAGE_MASK;
 	offset += FLASH_BASE;
-	*value = *(volatile short *) offset;
+	*value = *(unsigned volatile short *) offset;
 
-	return ERR_NONE;
+	return NO_ERR;
 }
 
-void ebiu_init()
+int flash_init()
 {
-	*pEBIU_AMBCTL0 = 0xf3c0ffc0;
-	*pEBIU_AMBCTL1 = 0xffc2ffc0;
-	*pEBIU_AMGCTL = 0xf;
-}
-
-
-int flash_init(int code)
-{
+	*pEBIU_AMGCTL = 0xff;
+	*pEBIU_AMBCTL0 = 0x7bb07bb0;
+	*pEBIU_AMBCTL1 = 0x7bb07bb0;
 	init_ledports();
 	set_led(0);
+
+	return NO_ERR;
+}
+
+int flash_erase()
+{
+	return flash_sendcmd_fullerase();
+}
+
+int flash_erase_blk(int block)
+{
+	unsigned long sector;
+
+	// if the block is invalid just return
+	if ((block < 0) || (block >= AFP_NumSectors))
+		return INVALID_BLOCK;
+
+	sector = block * AFP_SectorSize1;
+
+	return flash_sendcmd_blkerase(sector);
+}
+
+
+int flash_get_sectno(unsigned long offset, int *secno)
+{
+	int s = 0;
+
+	s = (offset / AFP_SectorSize1);
+
+	if (s >= 0 && s < AFP_NumSectors)
+		*secno = s;
+	else
+		return INVALID_SECTOR;
+
+	return NO_ERR;
+}
+
+
+int flash_get_sectaddr(unsigned long *start, unsigned long *end, int sector)
+{
+	// main block
+	if( sector < NUM_SECTORS ) {
+		*start = sector * AFP_SectorSize1;
+		*end = ( (*start) + AFP_SectorSize1 );
+	}
+	else
+		return INVALID_SECTOR;
+
+
+	*end -= 1;
+
+	return NO_ERR;
+}
+
+
+
+////////////////////////////////////////////////////////////////////////////
+// MAIN
+
+int main()
+{
+	int i = 0;
+
 	AFP_Buffer = g_buffer;
 
-	if (code != 0x22d7) {
-		return ERR_CHIP_UNSUPPORTED;
+	//initiate sector information structures
+	for(i = 0; i < AFP_NumSectors; i++) {
+		flash_get_sectaddr(&SectorInfo[i].start,
+				&SectorInfo[i].end, i);
 	}
 
-	AFP_SectorSize1 = g_sectormap[0].size;
+	AFP_SectorInfo = (int *) &SectorInfo[0];
 
-	return ERR_NONE;
+	flash_init();
+	flash_get_codes();
+
+	// main loop
+	while (1) {
+		// the plug-in will set a breakpoint at "AFP_BreakReady" so it knows
+		// when we are ready for a new command because the DSP will halt
+		//
+		// the jump is used so that the label will be part of the debug
+		// information in the driver image otherwise it may be left out
+		// since the label is not referenced anywhere
+		asm("AFP_BreakReady:");
+		asm("nop;");
+		if (0)
+			asm("jump AFP_BreakReady;");
+
+		switch (AFP_Command)
+		{
+			case GET_CODES:
+				AFP_Error = flash_get_codes();
+				break;
+			case RESET:
+				AFP_Error = flash_reset();
+				break;
+			case WRITE:
+				AFP_Error = flash_writechunk(AFP_Offset, AFP_Count,
+						AFP_Stride, AFP_Buffer );
+				break;
+			case FILL:
+				AFP_Error = flash_fill(AFP_Offset, AFP_Count,
+						AFP_Stride, AFP_Buffer );
+				break;
+			case ERASE_ALL:
+				AFP_Error = flash_erase();
+				break;
+			case ERASE_SECT:
+				AFP_Error = flash_erase_blk(AFP_Sector);
+				break;
+			case READ:
+				AFP_Error = flash_readchunk(AFP_Offset, AFP_Count,
+						AFP_Stride, AFP_Buffer);
+				break;
+			case GET_SECTNUM:
+				AFP_Error = flash_get_sectno(AFP_Offset, &AFP_Sector);
+			case GET_SECSTARTEND:
+				AFP_Error = flash_get_sectaddr(&AFP_StartOff,
+						&AFP_EndOff, AFP_Sector);
+				break;
+			case NO_COMMAND:
+			default:
+				AFP_Error = UNKNOWN_COMMAND;
+				break;
+		}
+		AFP_Command = NO_COMMAND;
+	}
+	return 0;
 }
 
 

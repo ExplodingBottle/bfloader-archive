@@ -146,10 +146,6 @@ define writefile
 		dump_error $error
 		echo \n
 		printf "--------------------------\n"
-	else
-		printf "--------------------------\n"
-		printf "-- DONE                 --\n"
-		printf "--------------------------\n"
 	end
 end
 
@@ -170,6 +166,7 @@ define erase_blocks
 end
 
 define reset_flash
+	printf "Resetting flash...\n"
 	exec_command $CMD_RESET
 end
 

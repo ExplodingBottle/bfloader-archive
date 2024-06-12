@@ -35,25 +35,5 @@
 #define CMD_GETCODE2    0x55
 #define CMD_GETCODE3    0x90
 
-// Specific Intel commands
-
-#define SR_READY        0x80
-#define SR_SUSP_ERASE   0x40
-#define SR_ERR_ERASE    0x20
-#define SR_ERR_PROG     0x10
-#define SR_ERR_VOLTAGE  0x08
-#define SR_SUSP_PROG    0x04
-#define SR_ERR_LOCKED   0x02
-
-#define ICMD_PROG_BYTE  0x10
-#define ICMD_BLKERASE   0x20
-#define ICMD_PROG_WORD  0x40
-#define ICMD_CLRSTATUS  0x50
-#define ICMD_LOCK       0x60
-#define ICMD_READID     0x90
-#define ICMD_ERASECONF  0xd0
-#define ICMD_READARRAY  0xff
-
-
-#define ADDR_DEV        0x000
-#define ADDR_ID         0x002
+#define ADDR_DEV        0x400
+#define ADDR_ID         0x402
